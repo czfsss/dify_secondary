@@ -66,11 +66,7 @@ const Question: FC<QuestionProps> = ({
 
   const handleResend = useCallback(() => {
     setIsEditing(false)
-    onRegenerate?.({
-      ...item,
-      message: editedContent,
-      files: message_files
-    })
+    onRegenerate?.(item, { message: editedContent, files: message_files })
   }, [editedContent, message_files, item, onRegenerate])
 
   const handleCancelEditing = useCallback(() => {
@@ -105,11 +101,10 @@ const Question: FC<QuestionProps> = ({
   return (
     <div className={cn(
       'mb-2 flex last:mb-0',
-      isMobile ? 'flex-col items-end' : 'justify-end' // 移动端使用 items-end 右对齐
+      isMobile ? 'flex-col items-end' : 'justify-end',
     )}>
-      {/* 移动端头像在上方 - 靠右对齐 */}
       {isMobile && (
-        <div className='h-10 w-10 shrink-0 mb-1'>
+        <div className='mb-1 h-10 w-10 shrink-0'>
           {
             questionIcon || (
               <div className='h-full w-full rounded-full border-[0.5px] border-black/5'>
@@ -119,16 +114,19 @@ const Question: FC<QuestionProps> = ({
           }
         </div>
       )}
-      
+
       <div className={cn(
-        'group relative flex items-start overflow-x-hidden',
+        'group relative flex items-start', // 移除 overflow-x-hidden
         isEditing && 'flex-1',
-        !isMobile && 'mr-4'
+        !isMobile && 'mr-4',
       )}>
         <div className={cn('mr-2 gap-1', isEditing ? 'hidden' : 'flex')}>
           <div
-            className="absolute hidden gap-0.5 rounded-[10px] border-[0.5px] border-components-actionbar-border bg-components-actionbar-bg p-0.5 shadow-md backdrop-blur-sm group-hover:flex"
-            style={{ right: contentWidth + 8 }}
+            className={cn(
+              'absolute z-10 hidden gap-0.5 rounded-[10px] border-[0.5px] border-components-actionbar-border bg-components-actionbar-bg p-0.5 shadow-md backdrop-blur-sm group-hover:flex', // z-index从10提高到20
+              isMobile ? 'right-2 top-[-10px]' : 'top-[-25px]', // 修改桌面端位置
+            )}
+            // 移除右偏移计算：style={{ right: !isMobile ? contentWidth + 8 : undefined }}
           >
             <ActionButton onClick={() => {
               copy(content)
@@ -144,9 +142,9 @@ const Question: FC<QuestionProps> = ({
         <div
           ref={contentRef}
           className={cn(
-            'w-full rounded-2xl bg-background-gradient-bg-fill-chat-bubble-bg-3 px-4 py-3 text-sm text-text-primary',
-            isMobile ? 'mt-1 ml-auto max-w-[90%]' : '', // 移动端右对齐并限制宽度
-            theme?.chatBubbleColorStyle ? CssTransform(theme.chatBubbleColorStyle) : {}
+            'bg-background-gradient-bg-fill-chat-bubble-bg-3 w-full rounded-2xl px-4 py-3 text-sm text-text-primary',
+            isMobile ? 'ml-auto mt-1 max-w-[90%]' : '',
+            theme?.chatBubbleColorStyle ? CssTransform(theme.chatBubbleColorStyle) : {},
           )}
         >
           {
@@ -191,8 +189,7 @@ const Question: FC<QuestionProps> = ({
         </div>
         <div className='mt-1 h-[18px]' />
       </div>
-      
-      {/* 桌面端头像在右侧 */}
+
       {!isMobile && (
         <div className='h-10 w-10 shrink-0'>
           {

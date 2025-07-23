@@ -1,0 +1,244 @@
+// 导入 React 相关类型和模块
+import type {
+  FC,              // 函数组件类型
+  ReactNode,        // React 节点类型
+} from 'react'
+import {
+  memo,             // 用于创建记忆化组件
+  useCallback,      // 用于记忆化回调函数
+  useEffect,        // 处理副作用
+  useRef,           // 创建可变的引用对象
+  useState,         // 状态管理
+} from 'react'
+import type { ChatItem } from '../types'         // 聊天项类型定义
+import type { Theme } from '../embedded-chatbot/theme/theme-context'  // 主题类型
+import { CssTransform } from '../embedded-chatbot/theme/utils'       // 主题工具函数
+import ContentSwitch from './content-switch'      // 聊天内容切换组件
+import { User } from '@/app/components/base/icons/src/public/avatar' // 用户头像图标
+import { Markdown } from '@/app/components/base/markdown'            // Markdown 渲染组件
+import { FileList } from '@/app/components/base/file-uploader'       // 文件列表组件
+import ActionButton from '../../action-button'    // 操作按钮组件
+import { RiClipboardLine, RiEditLine } from '@remixicon/react' // 剪贴板和编辑图标
+import Toast from '../../toast'                   // 提示组件
+import copy from 'copy-to-clipboard'              // 剪贴板复制库
+import { useTranslation } from 'react-i18next'    // 国际化钩子
+import cn from '@/utils/classnames'               // classnames 工具
+import Textarea from 'react-textarea-autosize'    // 自适应文本域
+import Button from '../../button'                 // 按钮组件
+import { useChatContext } from './context'        // 聊天上下文
+import { useResponsive } from '../../../../../hooks/use-responsive'  // 响应式钩子
+
+// 组件属性定义
+type QuestionProps = {
+  item: ChatItem            // 聊天项数据
+  questionIcon?: ReactNode  // 自定义问题图标
+  theme: Theme | null | undefined  // 主题配置
+  enableEdit?: boolean       // 是否允许编辑
+  switchSibling?: (siblingMessageId: string) => void  // 切换兄弟消息的回调
+}
+
+// 主要组件定义 (使用React.memo优化)
+const Question: FC<QuestionProps> = memo(({
+  item,
+  questionIcon,
+  theme,
+  enableEdit = true,
+  switchSibling,
+}) => {
+  const { t } = useTranslation()      // 国际化翻译函数
+  const { isMobile } = useResponsive()  // 响应式状态（是否移动端）
+
+  // 解构聊天项数据
+  const {
+    content,          // 消息内容
+    message_files,    // 消息附件
+  } = item
+
+  // 从上下文获取方法
+  const {
+    onRegenerate,     // 消息重新生成回调
+  } = useChatContext()
+
+  // 状态管理
+  const [isEditing, setIsEditing] = useState(false)          // 编辑状态
+  const [editedContent, setEditedContent] = useState(content) // 编辑中的内容
+  const [contentWidth, setContentWidth] = useState(0)         // 内容宽度
+  const contentRef = useRef<HTMLDivElement>(null)             // 内容DOM引用
+
+  // 编辑按钮处理
+  const handleEdit = useCallback(() => {
+    setIsEditing(true)                   // 进入编辑模式
+    setEditedContent(content)            // 初始化编辑内容
+  }, [content])
+
+  // 重新发送处理
+  const handleResend = useCallback(() => {
+    setIsEditing(false)                     // 退出编辑模式
+    onRegenerate?.(item, {                  // 调用重新生成
+      message: editedContent,
+      files: message_files
+    })
+  }, [editedContent, message_files, item, onRegenerate])
+
+  // 取消编辑
+  const handleCancelEditing = useCallback(() => {
+    setIsEditing(false)                     // 退出编辑模式
+    setEditedContent(content)               // 恢复原始内容
+  }, [content])
+
+  // 切换相邻消息
+  const handleSwitchSibling = useCallback((direction: 'prev' | 'next') => {
+    if (direction === 'prev')
+      item.prevSibling && switchSibling?.(item.prevSibling)  // 切换到上一条
+    else
+      item.nextSibling && switchSibling?.(item.nextSibling)  // 切换到下一条
+  }, [switchSibling, item.prevSibling, item.nextSibling])
+
+  // 获取内容宽度（用于定位操作按钮）
+  const getContentWidth = () => {
+    if (contentRef.current)
+      setContentWidth(contentRef.current?.clientWidth)
+  }
+
+  // 监听内容区域大小变化
+  useEffect(() => {
+    if (!contentRef.current) return
+    const resizeObserver = new ResizeObserver(() => {
+      getContentWidth()  // 更新内容宽度
+    })
+    resizeObserver.observe(contentRef.current)
+    
+    // 清理函数
+    return () => {
+      resizeObserver.disconnect()
+    }
+  }, [])
+
+  // 组件渲染
+  return (
+    // 整体容器
+    <div className={cn(
+      'mb-2 flex last:mb-0',
+      isMobile ? 'flex-col items-end' : 'justify-end'  // 响应式布局
+    )}>
+      {/* 移动端显示的图标 */}
+      {isMobile && (
+        <div className='h-10 w-10 shrink-0 mb-1'>
+          {questionIcon || (  // 使用自定义图标或默认用户图标
+            <div className='h-full w-full rounded-full border-[0.5px] border-black/5'>
+              <User className='h-full w-full' />
+            </div>
+          )}
+        </div>
+      )}
+      
+      {/* 消息内容区域 */}
+      <div className={cn(
+        'group relative flex items-start overflow-x-hidden',
+        isEditing && 'flex-1',          // 编辑模式时占据全部宽度
+        !isMobile && 'mr-4'             // 非移动端右边距
+      )}>
+        {/* 操作按钮组（悬停显示） */}
+        <div className={cn('mr-2 gap-1', isEditing ? 'hidden' : 'flex')}>
+          <div
+            className={cn(
+              "absolute hidden gap-0.5 rounded-[10px] border-[0.5px] border-components-actionbar-border bg-components-actionbar-bg p-0.5 shadow-md backdrop-blur-sm group-hover:flex z-10",
+              isMobile ? 'top-[-10px] right-2' : ''  // 移动端位置调整
+            )}
+            style={{ right: !isMobile ? contentWidth + 8 : undefined }}  // 桌面端根据内容宽度定位
+          >
+            {/* 复制按钮 */}
+            <ActionButton onClick={() => {
+              copy(content)  // 复制内容到剪贴板
+              Toast.notify({ type: 'success', message: t('common.actionMsg.copySuccessfully') })  // 显示成功提示
+            }}>
+              <RiClipboardLine className='h-4 w-4' />
+            </ActionButton>
+            
+            {/* 编辑按钮（根据enableEdit判断显示） */}
+            {enableEdit && (
+              <ActionButton onClick={handleEdit}>
+                <RiEditLine className='h-4 w-4' />
+              </ActionButton>
+            )}
+          </div>
+        </div>
+        
+        {/* 消息内容容器（含背景样式） */}
+        <div
+          ref={contentRef}  // 设置DOM引用
+          className={cn(
+            'w-full rounded-2xl bg-background-gradient-bg-fill-chat-bubble-bg-3 px-4 py-3 text-sm text-text-primary',
+            isMobile ? 'mt-1 ml-auto max-w-[90%]' : '',  // 移动端样式
+            theme?.chatBubbleColorStyle ? CssTransform(theme.chatBubbleColorStyle) : {}  // 应用主题样式
+          )}
+        >
+          {/* 附件列表 */}
+          {!!message_files?.length && (
+            <FileList
+              className='mb-2'
+              files={message_files}
+              showDeleteAction={false}
+              showDownloadAction={true}  // 显示下载按钮
+            />
+          )}
+          
+          {/* 内容显示区域 */}
+          {!isEditing ? (
+            // 普通模式：Markdown渲染
+            <Markdown content={content} />
+          ) : (
+            // 编辑模式：文本编辑区
+            <div className="flex flex-col gap-2 rounded-xl border border-components-chat-input-border bg-components-panel-bg-blur p-[9px] shadow-md">
+              <div className="max-h-[158px] overflow-y-auto overflow-x-hidden">
+                <Textarea
+                  className={cn('body-lg-regular w-full p-1 leading-6 text-text-tertiary outline-none')}
+                  autoFocus  // 自动聚焦
+                  minRows={1}  // 最小行数
+                  value={editedContent}
+                  onChange={e => setEditedContent(e.target.value)}  // 实时更新编辑内容
+                />
+              </div>
+              {/* 编辑操作按钮 */}
+              <div className="flex justify-end gap-2">
+                <Button variant='ghost' onClick={handleCancelEditing}>
+                  {t('common.operation.cancel')}  {/* 取消 */}
+                </Button>
+                <Button variant='primary' onClick={handleResend}>
+                  {t('common.chat.resend')}  {/* 重新发送 */}
+                </Button>
+              </div>
+            </div>
+          )}
+          
+          {/* 消息切换控件（当有兄弟消息时） */}
+          {!isEditing && (
+            <ContentSwitch
+              count={item.siblingCount}       // 兄弟消息总数
+              currentIndex={item.siblingIndex} // 当前索引
+              prevDisabled={!item.prevSibling} // 上一条是否禁用
+              nextDisabled={!item.nextSibling} // 下一条是否禁用
+              switchSibling={handleSwitchSibling}  // 切换回调
+            />
+          )}
+        </div>
+        {/* 高度占位符 */}
+        <div className='mt-1 h-[18px]' />
+      </div>
+      
+      {/* 桌面端显示的图标 */}
+      {!isMobile && (
+        <div className='h-10 w-10 shrink-0'>
+          {questionIcon || (  // 使用自定义图标或默认用户图标
+            <div className='h-full w-full rounded-full border-[0.5px] border-black/5'>
+              <User className='h-full w-full' />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+})
+
+// 导出组件
+export default memo(Question)
