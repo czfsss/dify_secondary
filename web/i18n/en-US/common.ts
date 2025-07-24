@@ -147,7 +147,7 @@ const translation = {
   },
   menus: {
     status: 'beta',
-    explore: 'Explore',
+    explore: 'App Square',
     apps: 'Studio',
     appDetail: 'App Detail',
     account: 'Account',

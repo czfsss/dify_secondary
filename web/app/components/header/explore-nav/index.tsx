@@ -8,6 +8,7 @@ import {
   RiPlanetLine,
 } from '@remixicon/react'
 import classNames from '@/utils/classnames'
+import { useAppContext } from '@/context/app-context'
 type ExploreNavProps = {
   className?: string
 }
@@ -18,6 +19,11 @@ const ExploreNav = ({
   const { t } = useTranslation()
   const selectedSegment = useSelectedLayoutSegment()
   const activated = selectedSegment === 'explore'
+  const { isCurrentWorkspaceDatasetOperator } = useAppContext()
+
+  // Only show explore nav for non-dataset operators
+  if (isCurrentWorkspaceDatasetOperator)
+    return null
 
   return (
     <Link href="/explore/apps" className={classNames(
